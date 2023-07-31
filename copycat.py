@@ -9,6 +9,7 @@ import re
 retrieved_message_ids = set()
 user_messages = set()
 blacklist = set()
+original_senders = {}
 
 # Variable to indicate if the script is running
 running = True
@@ -26,11 +27,11 @@ def display_message(message):
             if replaced_content != content:
                 print("Replaced content:")
                 print(replaced_content)
-                send_reply(channel_id, replaced_content)
+                reply_to_original_sender(channel_id, replaced_content, message_id)
             else:
                 print("Message:")
                 print(content)
-                send_reply(channel_id, content)
+                reply_to_original_sender(channel_id, content, message_id)
 
             user_messages.add(content)
 
@@ -42,20 +43,34 @@ def retrieve_latest_messages(channelid):
         'limit': 2
     }
     r = requests.get(f'https://discord.com/api/v8/channels/{channelid}/messages', headers=headers, params=params)
-    messages = json.loads(r.text)
-    
+    try:
+        messages = json.loads(r.text)
+    except json.JSONDecodeError as e:
+        print("JSON decode error:", e)
+        return []
+
     if not isinstance(messages, list) or len(messages) == 0:
         return []
 
     return messages
 
-def send_reply(channelid, content):
+def reply_to_original_sender(channelid, content, message_id):
     headers = {
         'authorization': bot_token
     }
     data = {
-        'content': content  # Send the user's message content directly as the reply
+        'content': content
     }
+
+    # If the message_id exists in original_senders dictionary, reply to the original sender
+    original_sender_id = original_senders.get(message_id)
+    if original_sender_id:
+        data['message_reference'] = {
+            'message_id': message_id,
+            'guild_id': None,
+            'channel_id': channel_id
+        }
+
     requests.post(f'https://discord.com/api/v8/channels/{channelid}/messages', headers=headers, json=data)
 
 def input_thread():
@@ -72,13 +87,17 @@ def input_thread():
 
 # Read the configurations from config.json
 with open('config.json', 'r') as config_file:
-    config = json.load(config_file)
+    try:
+        config = json.load(config_file)
+    except json.JSONDecodeError as e:
+        print("JSON decode error:", e)
+        config = {}  # If there's an error, initialize an empty config dictionary
 
-bot_token = config["bot_token"]
-channel_id = config["channel_id"]
-target_user_ids = config["target_user_ids"]  # Use a list to store multiple targets
-owner_id = config["ownerid"]
-blacklist.update(word.lower() for word in config["blacklist"])
+bot_token = config.get("bot_token", "")
+channel_id = config.get("channel_id", "")
+target_user_ids = config.get("target_user_ids", [])  # Use a list to store multiple targets
+owner_id = config.get("ownerid", "")
+blacklist.update(word.lower() for word in config.get("blacklist", []))
 
 # Clear the console and print "The bot is working, showing messages in the channel."
 print("The bot is working, showing messages in the channel.")
@@ -92,13 +111,17 @@ input_thread.start()
 while True:
     if running:
         with open('config.json', 'r') as config_file:
-            config = json.load(config_file)
+            try:
+                config = json.load(config_file)
+            except json.JSONDecodeError as e:
+                print("JSON decode error:", e)
+                config = {}  # If there's an error, initialize an empty config dictionary
 
-        bot_token = config["bot_token"]
-        channel_id = config["channel_id"]
-        target_user_ids = config["target_user_ids"]  # Update target_user_ids
-        owner_id = config["ownerid"]
-        blacklist.update(word.lower() for word in config["blacklist"])
+        bot_token = config.get("bot_token", "")
+        channel_id = config.get("channel_id", "")
+        target_user_ids = config.get("target_user_ids", [])  # Update target_user_ids
+        owner_id = config.get("ownerid", "")
+        blacklist.update(word.lower() for word in config.get("blacklist", []))
 
         headers = {
             'authorization': bot_token
