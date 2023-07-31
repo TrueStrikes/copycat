@@ -1,0 +1,11 @@
+{
+    "bot_token": "usertoken",
+    "channel_id": "",
+    "target_user_ids": [
+        "target"
+    ],
+    "ownerid": "owner",
+    "blacklist": [
+        "gay"
+    ]
+}
